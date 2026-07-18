@@ -28,3 +28,11 @@ The aggregate portion of the output is deterministic:
 will vary between runs.
 
 The generated `data/` directory is disposable and ignored by Git.
+
+## Verify
+
+```sh
+uv run python -m unittest discover -p "test_*.py"
+```
+
+The same verification runs for every pull request and every push to `main`.
