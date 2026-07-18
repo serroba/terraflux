@@ -6,6 +6,7 @@ import duckdb
 
 
 EXPERIMENT_DIR = Path(__file__).resolve().parent
+TELEMETRY_FIXTURE = EXPERIMENT_DIR / "fixtures" / "telemetry.csv"
 DATASET_DIR = EXPERIMENT_DIR / "data" / "crossings"
 QUERY_DATE = "2026-07-17"
 
@@ -15,24 +16,35 @@ def main() -> None:
 
     with duckdb.connect() as connection:
         connection.execute(
-            """
+            f"""
             CREATE TABLE crossing_events AS
+            WITH ordered_telemetry AS (
+                SELECT
+                    *,
+                    lag(signed_gate_distance_nm) OVER (
+                        PARTITION BY mmsi ORDER BY observed_at
+                    ) AS previous_gate_distance_nm
+                FROM read_csv(
+                    '{TELEMETRY_FIXTURE.as_posix()}',
+                    header = true,
+                    timestampformat = '%Y-%m-%dT%H:%M:%SZ'
+                )
+            )
             SELECT
-                timestamp,
-                CAST(timestamp AS DATE) AS event_date,
+                observed_at AS timestamp,
+                CAST(observed_at AS DATE) AS event_date,
                 mmsi,
-                direction,
+                CASE
+                    WHEN signed_gate_distance_nm > 0 THEN 'outbound'
+                    ELSE 'inbound'
+                END AS direction,
                 vessel_class,
                 capacity_dwt
-            FROM (VALUES
-                (TIMESTAMP '2026-07-16 23:48:00', 100000001, 'outbound', 'crude_tanker',   300000),
-                (TIMESTAMP '2026-07-17 01:12:00', 100000002, 'outbound', 'crude_tanker',   320000),
-                (TIMESTAMP '2026-07-17 04:35:00', 100000003, 'inbound',  'product_tanker', 115000),
-                (TIMESTAMP '2026-07-17 09:07:00', 100000004, 'outbound', 'lng_carrier',    180000),
-                (TIMESTAMP '2026-07-17 14:51:00', 100000005, 'inbound',  'crude_tanker',   305000),
-                (TIMESTAMP '2026-07-17 20:16:00', 100000006, 'outbound', 'product_tanker', 520000),
-                (TIMESTAMP '2026-07-18 02:23:00', 100000007, 'inbound',  'crude_tanker',   310000)
-            ) AS events(timestamp, mmsi, direction, vessel_class, capacity_dwt)
+            FROM ordered_telemetry
+            WHERE previous_gate_distance_nm IS NOT NULL
+              AND signed_gate_distance_nm != 0
+              AND previous_gate_distance_nm != 0
+              AND sign(signed_gate_distance_nm) != sign(previous_gate_distance_nm)
             """
         )
 

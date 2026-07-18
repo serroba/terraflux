@@ -3,8 +3,14 @@
 This experiment tests one architectural idea: keep durable analytical data as
 partitioned Parquet and use an ephemeral DuckDB process to calculate aggregates.
 
-It deliberately starts with synthetic, already-detected crossing events. Identifying a
-crossing from raw AIS positions is a separate experiment.
+It starts with a checked-in synthetic telemetry fixture. Each observation includes a
+signed distance from a predefined gate: negative on the inbound side and positive on
+the outbound side. A vessel crossing is derived when consecutive observations for its
+MMSI change sign.
+
+Computing that signed distance from raw AIS coordinates and a geographic gate is a
+separate spatial experiment. Keeping it explicit here gives us a clean boundary without
+pretending the geometric problem is already solved.
 
 ## Run
 
@@ -14,9 +20,9 @@ From this directory:
 uv run generate_and_query.py
 ```
 
-The script writes deterministic events to `data/crossings/event_date=.../*.parquet`,
-queries one day directly from those files, and prints the aggregate plus basic execution
-diagnostics as JSON.
+The script reads `fixtures/telemetry.csv`, derives crossing events, writes them to
+`data/crossings/event_date=.../*.parquet`, queries one day directly from those files,
+and prints the aggregate plus basic execution diagnostics as JSON.
 
 The aggregate portion of the output is deterministic:
 
