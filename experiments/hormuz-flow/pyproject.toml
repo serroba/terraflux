@@ -15,6 +15,7 @@ package = false
 
 [dependency-groups]
 dev = [
+    "playwright>=1.61.0",
     "ruff>=0.15.22",
     "ty>=0.0.61",
 ]
