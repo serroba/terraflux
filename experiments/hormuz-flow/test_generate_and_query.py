@@ -27,6 +27,9 @@ class HormuzFlowExperimentTest(unittest.TestCase):
         # three outbound crude/LNG transits, not the two ballast returns.
         self.assertEqual(result["laden_crossings"], 3)
         self.assertEqual(result["laden_capacity_dwt"], 1_020_000)
+        # Laden capacity converted to energy via per-commodity net calorific values:
+        # 320k*42.3 (crude) + 180k*48.0 (LNG) + 520k*44.3 (products) GJ.
+        self.assertEqual(result["observed_energy_gj"], 45_212_000)
         self.assertGreaterEqual(result["query_elapsed_ms"], 0)
         self.assertGreater(result["partition_bytes"], 0)
 
