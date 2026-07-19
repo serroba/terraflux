@@ -45,9 +45,12 @@ The generated `data/` directory is disposable and ignored by Git.
 ## Verify
 
 ```sh
-uv run python -m unittest discover -p "test_*.py"
+uv run ruff check .          # lint
+uv run ruff format --check . # formatting
+uv run mypy .                # type check
+uv run python -m unittest discover -p "test_*.py"  # tests
 ```
 
-This runs both the end-to-end determinism test (`test_generate_and_query.py`) and the
-gate-geometry tests (`test_gate.py`). The same verification runs for every pull request
-and every push to `main`.
+The tests run both the end-to-end determinism test (`test_generate_and_query.py`) and
+the gate-geometry tests (`test_gate.py`). All four checks above run for every pull
+request and every push to `main`.

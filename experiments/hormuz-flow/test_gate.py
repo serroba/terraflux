@@ -5,7 +5,6 @@ from pathlib import Path
 
 from gate import HORMUZ_GATE, Gate
 
-
 EXPERIMENT_DIR = Path(__file__).resolve().parent
 TELEMETRY_FIXTURE = EXPERIMENT_DIR / "fixtures" / "telemetry.csv"
 

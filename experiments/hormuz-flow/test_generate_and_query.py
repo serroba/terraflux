@@ -1,9 +1,8 @@
 import json
-from pathlib import Path
 import subprocess
 import sys
 import unittest
-
+from pathlib import Path
 
 EXPERIMENT_DIR = Path(__file__).resolve().parent
 
