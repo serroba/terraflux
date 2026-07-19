@@ -3,6 +3,9 @@ from pathlib import Path
 from time import perf_counter
 
 import duckdb
+from duckdb.sqltypes import DOUBLE
+
+from gate import HORMUZ_GATE
 
 
 EXPERIMENT_DIR = Path(__file__).resolve().parent
@@ -15,20 +18,36 @@ def main() -> None:
     DATASET_DIR.mkdir(parents=True, exist_ok=True)
 
     with duckdb.connect() as connection:
+        # Derive the signed gate distance from raw coordinates in code, rather than
+        # reading it from the fixture. The fixture's own signed_gate_distance_nm
+        # column is now only a reference oracle (see test_gate.py).
+        connection.create_function(
+            "gate_distance_nm",
+            lambda lat, lon: HORMUZ_GATE.signed_distance_nm(lat, lon),
+            [DOUBLE, DOUBLE],
+            DOUBLE,
+        )
+
         connection.execute(
             f"""
             CREATE TABLE crossing_events AS
-            WITH ordered_telemetry AS (
+            WITH observations AS (
                 SELECT
-                    *,
-                    lag(signed_gate_distance_nm) OVER (
-                        PARTITION BY mmsi ORDER BY observed_at
-                    ) AS previous_gate_distance_nm
+                    * EXCLUDE (signed_gate_distance_nm),
+                    gate_distance_nm(latitude, longitude) AS signed_gate_distance_nm
                 FROM read_csv(
                     '{TELEMETRY_FIXTURE.as_posix()}',
                     header = true,
                     timestampformat = '%Y-%m-%dT%H:%M:%SZ'
                 )
+            ),
+            ordered_telemetry AS (
+                SELECT
+                    *,
+                    lag(signed_gate_distance_nm) OVER (
+                        PARTITION BY mmsi ORDER BY observed_at
+                    ) AS previous_gate_distance_nm
+                FROM observations
             )
             SELECT
                 observed_at AS timestamp,
