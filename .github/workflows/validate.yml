@@ -68,3 +68,38 @@ jobs:
 
       - name: Smoke test published site
         run: uv run python -m unittest discover -p "smoke_*.py"
+
+  live-ais:
+    name: Live AIS receiver
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: experiments/live-ais
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v7
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@08807647e7069bb48b6ef5acd8ec9567f424441b # v8.1.0
+        with:
+          version: "0.11.29"
+          enable-cache: true
+          cache-dependency-glob: experiments/live-ais/uv.lock
+
+      - name: Install dependencies
+        run: uv sync --locked
+
+      - name: Lint
+        run: uv run ruff check .
+
+      - name: Check formatting
+        run: uv run ruff format --check .
+
+      - name: Type check
+        run: uv run ty check .
+
+      # Unit tests only (pure parser + bbox). The receiver itself needs live
+      # network to the Digitraffic broker and is not run in CI.
+      - name: Verify parser
+        run: uv run python -m unittest discover -p "test_*.py"

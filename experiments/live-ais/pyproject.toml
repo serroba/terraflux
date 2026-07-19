@@ -1,0 +1,26 @@
+[project]
+name = "terraflux-live-ais"
+version = "0.1.0"
+description = "Live Digitraffic AIS receiver for Terraflux (Gulf of Finland)"
+requires-python = ">=3.12"
+dependencies = [
+    "paho-mqtt>=2.1.0",
+]
+
+[tool.uv]
+package = false
+
+[dependency-groups]
+dev = [
+    "ruff>=0.15.22",
+    "ty>=0.0.61",
+]
+
+[tool.ruff]
+target-version = "py312"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP", "B"]
+
+[tool.ty.environment]
+python-version = "3.12"

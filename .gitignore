@@ -2,3 +2,5 @@
 **/.venv/
 **/__pycache__/
 **/data/
+# Raw AIS captures are never committed (publish aggregates only, not raw positions).
+experiments/live-ais/*.csv
