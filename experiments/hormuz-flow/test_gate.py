@@ -32,6 +32,25 @@ class GateGeometryTest(unittest.TestCase):
         self.assertTrue(HORMUZ_GATE.is_laden("outbound"))
         self.assertFalse(HORMUZ_GATE.is_laden("inbound"))
 
+    def test_midpoint_is_between_endpoints(self) -> None:
+        lat, lon = HORMUZ_GATE.midpoint()
+        self.assertAlmostEqual(lat, 26.575)
+        self.assertAlmostEqual(lon, 56.22)
+
+    def test_outbound_bearing_points_to_positive_side(self) -> None:
+        # A point just past the midpoint along the outbound bearing must have a
+        # positive signed distance; the opposite bearing must be negative.
+        from math import cos, radians, sin
+
+        lat0, lon0 = HORMUZ_GATE.midpoint()
+        bearing = radians(HORMUZ_GATE.outbound_bearing_deg())
+        step = 0.02
+        out_lat = lat0 + step * cos(bearing)
+        out_lon = lon0 + step * sin(bearing) / cos(radians(lat0))
+        in_lat, in_lon = 2 * lat0 - out_lat, 2 * lon0 - out_lon
+        self.assertGreater(HORMUZ_GATE.signed_distance_nm(out_lat, out_lon), 0.0)
+        self.assertLess(HORMUZ_GATE.signed_distance_nm(in_lat, in_lon), 0.0)
+
     def test_computed_sign_matches_fixture_oracle(self) -> None:
         # Each fixture still carries a hand-authored signed_gate_distance_nm. It is
         # no longer the source of truth, but it records the intended side for each
