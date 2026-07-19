@@ -1,0 +1,140 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Terraflux — browser flux (DuckDB-WASM)</title>
+    <style>
+      body {
+        font-family: ui-sans-serif, system-ui, -apple-system, sans-serif;
+        max-width: 900px;
+        margin: 2rem auto;
+        padding: 0 1rem;
+        color: #1a1a1a;
+      }
+      h1 { font-size: 1.25rem; }
+      p.lede { color: #444; }
+      #status { font-family: ui-monospace, monospace; color: #555; }
+      table { border-collapse: collapse; margin: 1rem 0; width: 100%; }
+      th, td { border: 1px solid #ddd; padding: 0.4rem 0.6rem; text-align: right; }
+      th:first-child, td:first-child { text-align: left; }
+      thead { background: #f4f4f4; }
+      pre {
+        background: #f7f7f7; padding: 1rem; overflow-x: auto; border-radius: 6px;
+        font-size: 0.85rem;
+      }
+      .note { font-size: 0.85rem; color: #666; }
+    </style>
+  </head>
+  <body>
+    <h1>Terraflux — daily flux, queried in your browser</h1>
+    <p class="lede">
+      This page runs <strong>DuckDB-WASM</strong> entirely client-side. It reads the
+      aggregate Parquet produced by the Python pipeline and computes the same per-gate
+      flux for 2026-07-17 — no query server involved.
+    </p>
+    <p id="status">Booting DuckDB-WASM…</p>
+    <div id="output"></div>
+
+    <script type="module">
+      // Pinned DuckDB-WASM release. We import its ESM bundle and load the baseline
+      // "mvp" wasm explicitly rather than via selectBundle(): auto-selection can pick
+      // the exception-handling / threaded build, which needs cross-origin isolation
+      // (COOP/COEP) that a plain static host does not provide.
+      const DUCKDB_VERSION = "1.31.0";
+      const DIST = `https://cdn.jsdelivr.net/npm/@duckdb/duckdb-wasm@${DUCKDB_VERSION}/dist`;
+      const duckdb = await import(
+        `https://cdn.jsdelivr.net/npm/@duckdb/duckdb-wasm@${DUCKDB_VERSION}/+esm`
+      );
+
+      const status = document.getElementById("status");
+      const output = document.getElementById("output");
+      const setStatus = (msg) => (status.textContent = msg);
+
+      // Aggregate query — the same shape as query_daily_flux() in the Python pipeline.
+      // Sums are cast to BIGINT so they arrive as plain numbers, not 128-bit integers.
+      const QUERY = `
+        SELECT
+          gate,
+          count(*) AS observed_crossings,
+          count(*) FILTER (WHERE direction = 'inbound') AS inbound_crossings,
+          count(*) FILTER (WHERE direction = 'outbound') AS outbound_crossings,
+          CAST(sum(capacity_dwt) AS BIGINT) AS observed_capacity_dwt,
+          count(*) FILTER (WHERE laden) AS laden_crossings,
+          CAST(sum(capacity_dwt) FILTER (WHERE laden) AS BIGINT) AS laden_capacity_dwt,
+          CAST(round(sum(energy_gj) FILTER (WHERE laden)) AS BIGINT) AS observed_energy_gj
+        FROM read_parquet('crossings.parquet')
+        WHERE event_date = DATE '2026-07-17'
+        GROUP BY gate
+        ORDER BY gate`;
+
+      const toNumber = (v) => (typeof v === "bigint" ? Number(v) : v);
+
+      async function main() {
+        const workerUrl = URL.createObjectURL(
+          new Blob([`importScripts("${DIST}/duckdb-browser-mvp.worker.js");`], {
+            type: "text/javascript",
+          }),
+        );
+
+        const worker = new Worker(workerUrl);
+        const db = new duckdb.AsyncDuckDB(new duckdb.ConsoleLogger(), worker);
+        await db.instantiate(`${DIST}/duckdb-mvp.wasm`);
+        URL.revokeObjectURL(workerUrl);
+        setStatus("DuckDB-WASM ready — fetching Parquet…");
+
+        const parquetUrl = new URL("crossings.parquet", location.href).href;
+        await db.registerFileURL(
+          "crossings.parquet",
+          parquetUrl,
+          duckdb.DuckDBDataProtocol.HTTP,
+          false,
+        );
+
+        const conn = await db.connect();
+        const result = await conn.query(QUERY);
+        const rows = result.toArray().map((r) => {
+          const o = r.toJSON();
+          for (const k of Object.keys(o)) o[k] = toNumber(o[k]);
+          return o;
+        });
+        await conn.close();
+
+        render(rows);
+        setStatus(`Done — ${rows.length} gate(s) queried client-side.`);
+      }
+
+      function render(rows) {
+        if (rows.length === 0) {
+          output.innerHTML = "<p>No rows for 2026-07-17.</p>";
+          return;
+        }
+        const cols = Object.keys(rows[0]);
+        const head = `<tr>${cols.map((c) => `<th>${c}</th>`).join("")}</tr>`;
+        const body = rows
+          .map(
+            (r) =>
+              `<tr>${cols
+                .map((c) => `<td>${r[c].toLocaleString?.() ?? r[c]}</td>`)
+                .join("")}</tr>`,
+          )
+          .join("");
+        const pj = rows
+          .map(
+            (r) =>
+              `${r.gate}: ${(r.observed_energy_gj / 1e6).toFixed(1)} PJ`,
+          )
+          .join(" · ");
+        output.innerHTML =
+          `<table><thead>${head}</thead><tbody>${body}</tbody></table>` +
+          `<p class="note">Energy leaving each strait — ${pj}</p>` +
+          `<pre>${JSON.stringify(rows, null, 2)}</pre>`;
+      }
+
+      main().catch((err) => {
+        console.error(err);
+        setStatus(`Error: ${err?.message ?? err}`);
+      });
+    </script>
+  </body>
+</html>
