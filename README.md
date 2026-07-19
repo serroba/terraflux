@@ -99,12 +99,14 @@ It currently:
 
 1. Reads 15 synthetic telemetry observations from
    `experiments/hormuz-flow/fixtures/telemetry.csv`.
-2. Orders observations by MMSI and time.
-3. Detects a crossing when consecutive signed gate distances change sign.
-4. Assigns direction from the side entered.
-5. Writes derived events as date-partitioned Parquet under the ignored `data/` folder.
-6. Queries one day directly from those Parquet files with DuckDB.
-7. Prints a JSON aggregate plus local timing and partition-size diagnostics.
+2. Computes each observation's signed distance from a coordinate-defined gate in code
+   (`experiments/hormuz-flow/gate.py`), using a planar approximation.
+3. Orders observations by MMSI and time.
+4. Detects a crossing when consecutive signed gate distances change sign.
+5. Assigns direction from the side entered.
+6. Writes derived events as date-partitioned Parquet under the ignored `data/` folder.
+7. Queries one day directly from those Parquet files with DuckDB.
+8. Prints a JSON aggregate plus local timing and partition-size diagnostics.
 
 The deterministic result for 2026-07-17 is:
 
@@ -118,9 +120,12 @@ The deterministic result for 2026-07-17 is:
 }
 ```
 
-The fixture already contains latitude and longitude, but its
-`signed_gate_distance_nm` value is supplied explicitly. Computing that value from a
-defined geographic gate is intentionally unresolved.
+The signed gate distance is now computed from each observation's latitude and
+longitude against a coordinate-defined gate (`experiments/hormuz-flow/gate.py`), using
+a planar approximation. The fixture retains its original `signed_gate_distance_nm`
+column only as a reference oracle: a test asserts the computed geometry agrees with it
+on sign for every row. Geodesic accuracy, gate buffers, and noisy trajectories remain
+intentionally unresolved.
 
 GitHub Actions runs the deterministic experiment test for every pull request and every
 push to `main`. The workflow has read-only repository permissions and installs the
@@ -144,27 +149,21 @@ Generated Parquet and virtual-environment files are ignored by Git.
 - PR #2 added deterministic tests and the GitHub Actions validation gate.
 - PR #3 moved synthetic input into a telemetry fixture and derived crossings from
   consecutive observations.
+- A later change replaced the fixture-supplied signed gate distance with a
+  coordinate-defined gate and an in-code planar geometry calculation, keeping the
+  five-crossing daily result and adding direct geometry tests.
 
-All three were validated and merged. At the time of this handoff, local `main` is
-synchronized with `origin/main` at merge commit `4a0d7e3`.
+PRs #1–#3 were validated and merged; at that point local `main` was synchronized with
+`origin/main` at merge commit `4a0d7e3`.
 
 ## Recommended next iterations
 
-Continue with one reviewable change per pull request. The next smallest useful slice is:
+Continue with one reviewable change per pull request. The in-code planar gate geometry
+described above is now done. Likely follow-ups are:
 
-1. Define one explicit Hormuz gate as two geographic coordinates.
-2. Calculate which side of that line each telemetry coordinate occupies.
-3. Derive the signed value in code instead of reading `signed_gate_distance_nm` from the
-   fixture.
-4. Preserve the existing five-crossing daily result and CI test.
-
-Keep this first spatial implementation intentionally local and planar if its assumptions
-are documented. A later experiment can assess geodesic calculations, noisy trajectories,
-gate buffers, interpolation, deduplication, out-of-order messages, and vessels lingering
-near the line.
-
-After the spatial slice succeeds, likely follow-ups are:
-
+- harden the planar assumption: assess geodesic calculations, noisy trajectories, gate
+  buffers, interpolation, deduplication, out-of-order messages, and vessels lingering
+  near the line
 - add coverage-quality metrics to the daily result
 - separate raw observation, enriched observation, crossing-event, and aggregate schemas
 - write source telemetry to chunked Parquet before deriving events

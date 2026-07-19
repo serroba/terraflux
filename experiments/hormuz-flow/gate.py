@@ -1,0 +1,76 @@
+"""Planar geometry for a maritime flow gate.
+
+A gate is a line segment between two geographic endpoints. The signed distance of
+an observation is its perpendicular distance, in nautical miles, from that line:
+positive on the outbound side and negative on the inbound side. A vessel crosses
+the gate when that sign changes between consecutive observations.
+
+This implementation is intentionally *planar* (flat-earth). Over the few nautical
+miles that span a strait, projecting latitude/longitude onto a locally Cartesian
+grid is accurate enough to decide which side of a line a point is on. Geodesic
+distance, gate buffers, noisy trajectories, interpolation, and lingering vessels
+are deliberately out of scope here and left to a later spatial experiment (see the
+project README).
+"""
+
+from __future__ import annotations
+
+from dataclasses import dataclass
+from math import cos, hypot, radians
+
+# One degree of latitude is ~60 nautical miles anywhere on the globe. One degree
+# of longitude shrinks by cos(latitude) as you move away from the equator.
+NM_PER_DEGREE_LATITUDE = 60.0
+
+
+@dataclass(frozen=True)
+class Gate:
+    """A flow gate defined by two geographic endpoints (start -> end)."""
+
+    name: str
+    start_lat: float
+    start_lon: float
+    end_lat: float
+    end_lon: float
+
+    def signed_distance_nm(self, lat: float, lon: float) -> float:
+        """Signed perpendicular distance from the gate line, in nautical miles.
+
+        Positive on the outbound side, negative on the inbound side, and ~0 on the
+        line itself. Uses an equirectangular projection centred on the gate, so
+        longitude degrees are scaled by the cosine of the local latitude.
+
+        Sign is the sign of the 2D cross product of the gate vector (start -> end)
+        with the vector from the gate start to the point. Whether a given side is
+        "outbound" therefore depends on the endpoint order; the endpoints below are
+        ordered so that the Gulf-of-Oman side is positive.
+        """
+        lat0 = (self.start_lat + self.end_lat) / 2.0
+        lon_scale = NM_PER_DEGREE_LATITUDE * cos(radians(lat0))
+
+        # Local planar coordinates (nm) relative to the gate start. The choice of
+        # origin cancels out in the cross product, so start-as-origin is fine.
+        gate_x = (self.end_lon - self.start_lon) * lon_scale
+        gate_y = (self.end_lat - self.start_lat) * NM_PER_DEGREE_LATITUDE
+        point_x = (lon - self.start_lon) * lon_scale
+        point_y = (lat - self.start_lat) * NM_PER_DEGREE_LATITUDE
+
+        gate_length = hypot(gate_x, gate_y)
+        if gate_length == 0.0:
+            raise ValueError(f"Gate {self.name!r} has zero length")
+
+        cross = gate_x * point_y - gate_y * point_x
+        return cross / gate_length
+
+
+# Illustrative synthetic gate for the Strait of Hormuz. These coordinates are a
+# short line across the strait chosen for this experiment; they are not a surveyed
+# traffic boundary. The endpoint order makes the Gulf-of-Oman (outbound) side
+# positive and the Persian-Gulf (inbound) side negative.
+HORMUZ_GATE = Gate(
+    name="strait_of_hormuz",
+    start_lat=26.60,
+    start_lon=56.19,
+    end_lat=26.55,
+    end_lon=56.25,
+)
