@@ -43,14 +43,14 @@
       <p id="status">Booting…</p>
     </div>
 
-    <script src="https://cdn.jsdelivr.net/npm/globe.gl"></script>
+    <script src="https://cdn.jsdelivr.net/npm/globe.gl@2.46.1"></script>
     <script type="module">
       const status = document.getElementById("status");
       const setStatus = (m) => (status.textContent = m);
 
       const DUCKDB_VERSION = "1.31.0";
       const DIST = `https://cdn.jsdelivr.net/npm/@duckdb/duckdb-wasm@${DUCKDB_VERSION}/dist`;
-      const TEX = "https://unpkg.com/three-globe/example/img";
+      const TEX = "https://unpkg.com/three-globe@2.45.2/example/img";
 
       const FLUX_QUERY = `
         SELECT

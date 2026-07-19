@@ -25,9 +25,9 @@ PARQUET_OUTPUT = DOCS_DIR / "crossings.parquet"
 GATES_OUTPUT = DOCS_DIR / "gates.json"
 
 
-def write_gates_json() -> None:
-    """Emit gate locations and outbound flow bearing for the map to plot."""
-    gates = []
+def gates_metadata() -> list[dict[str, object]]:
+    """Gate locations and outbound flow bearing, as the map plots them."""
+    gates: list[dict[str, object]] = []
     for gate in GATES.values():
         lat, lon = gate.midpoint()
         gates.append(
@@ -39,7 +39,17 @@ def write_gates_json() -> None:
                 "outbound_bearing_deg": round(gate.outbound_bearing_deg(), 1),
             }
         )
-    GATES_OUTPUT.write_text(json.dumps(gates, indent=2) + "\n")
+    return gates
+
+
+def gates_json() -> str:
+    """Serialized gate metadata, exactly as written to docs/gates.json."""
+    return json.dumps(gates_metadata(), indent=2) + "\n"
+
+
+def write_gates_json() -> None:
+    """Emit gate locations and outbound flow bearing for the map to plot."""
+    GATES_OUTPUT.write_text(gates_json())
 
 
 def main() -> None:
