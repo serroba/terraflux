@@ -1,12 +1,13 @@
-"""Flatten the derived crossings into a single Parquet for the browser spike.
+"""Build the published site data for the docs/ folder (GitHub Pages).
 
 Run ``generate_and_query.py`` first to populate ``data/crossings/``. This reads that
-partitioned dataset and writes ``web/crossings.parquet`` — the file the DuckDB-WASM
-page (``web/index.html``) queries directly in the browser.
+partitioned dataset and writes the aggregate artifacts the browser pages query:
+``docs/crossings.parquet`` and ``docs/gates.json``.
 
-Kept separate from the main pipeline so the browser experiment stays easy to remove:
-it proves the read path (aggregate Parquet queried client-side), and the derivation
-still happens here, server-side.
+The HTML in ``docs/`` is source-controlled; only these aggregate data files are
+generated. GitHub Pages serves ``docs/`` from ``main``, so the generated files are
+committed — publishing aggregate Parquet is exactly the product model. The derivation
+still happens here, server-side; only aggregates reach the client.
 """
 
 import json
@@ -18,9 +19,10 @@ from gate import GATES
 
 EXPERIMENT_DIR = Path(__file__).resolve().parent
 DATASET_DIR = EXPERIMENT_DIR / "data" / "crossings"
-WEB_DIR = EXPERIMENT_DIR / "web"
-PARQUET_OUTPUT = WEB_DIR / "crossings.parquet"
-GATES_OUTPUT = WEB_DIR / "gates.json"
+REPO_ROOT = EXPERIMENT_DIR.parent.parent
+DOCS_DIR = REPO_ROOT / "docs"
+PARQUET_OUTPUT = DOCS_DIR / "crossings.parquet"
+GATES_OUTPUT = DOCS_DIR / "gates.json"
 
 
 def write_gates_json() -> None:
@@ -46,7 +48,7 @@ def main() -> None:
             "No Parquet found under data/crossings/. Run generate_and_query.py first."
         )
 
-    WEB_DIR.mkdir(parents=True, exist_ok=True)
+    DOCS_DIR.mkdir(parents=True, exist_ok=True)
     with duckdb.connect() as connection:
         connection.execute(
             f"""

@@ -1,0 +1,16 @@
+[
+  {
+    "name": "strait_of_hormuz",
+    "lat": 26.575000000000003,
+    "lon": 56.22,
+    "laden_direction": "outbound",
+    "outbound_bearing_deg": 43.0
+  },
+  {
+    "name": "strait_of_malacca",
+    "lat": 2.5,
+    "lon": 101.325,
+    "laden_direction": "outbound",
+    "outbound_bearing_deg": 38.7
+  }
+]

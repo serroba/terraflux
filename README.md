@@ -148,6 +148,15 @@ GitHub Actions runs the deterministic experiment test for every pull request and
 push to `main`. The workflow has read-only repository permissions and installs the
 locked DuckDB dependency with `uv`.
 
+## Published site
+
+A static site under [`docs/`](docs/README.md) is deployed by GitHub Pages
+(`main` / `/docs`) at **<https://serroba.github.io/terraflux/>**. It runs the read path
+entirely in the browser: the pages load DuckDB-WASM, read the aggregate Parquet, and
+compute per-gate flux client-side — a flux map plus a plain table, no query server. Only
+aggregate data is shipped to the client. Rebuild the aggregate artifacts with
+`experiments/hormuz-flow/build_site.py` (see `docs/README.md`).
+
 ## Run locally
 
 Requirements: `uv` and a supported Python version.
