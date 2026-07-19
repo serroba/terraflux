@@ -25,13 +25,25 @@ NM_PER_DEGREE_LATITUDE = 60.0
 
 @dataclass(frozen=True)
 class Gate:
-    """A flow gate defined by two geographic endpoints (start -> end)."""
+    """A flow gate defined by two geographic endpoints (start -> end).
+
+    ``laden_direction`` records which crossing direction is expected to be laden
+    (cargo-carrying) at this gate. At an exporting chokepoint like Hormuz, vessels
+    leave loaded and return in ballast, so the outbound direction is laden. This is
+    a coarse per-gate proxy; a later slice can refine laden state from reported
+    draught.
+    """
 
     name: str
     start_lat: float
     start_lon: float
     end_lat: float
     end_lon: float
+    laden_direction: str
+
+    def is_laden(self, direction: str) -> bool:
+        """Whether a crossing in ``direction`` is treated as laden at this gate."""
+        return direction == self.laden_direction
 
     def signed_distance_nm(self, lat: float, lon: float) -> float:
         """Signed perpendicular distance from the gate line, in nautical miles.
@@ -73,4 +85,7 @@ HORMUZ_GATE = Gate(
     start_lon=56.19,
     end_lat=26.55,
     end_lon=56.25,
+    # Hormuz is a crude/LNG export chokepoint: loaded vessels head outbound to the
+    # Gulf of Oman; inbound vessels return in ballast.
+    laden_direction="outbound",
 )

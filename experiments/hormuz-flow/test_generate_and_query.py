@@ -23,6 +23,10 @@ class HormuzFlowExperimentTest(unittest.TestCase):
         self.assertEqual(result["inbound_crossings"], 2)
         self.assertEqual(result["outbound_crossings"], 3)
         self.assertEqual(result["observed_capacity_dwt"], 1_440_000)
+        # At Hormuz the laden (loaded) leg is outbound, so laden flux tracks the
+        # three outbound crude/LNG transits, not the two ballast returns.
+        self.assertEqual(result["laden_crossings"], 3)
+        self.assertEqual(result["laden_capacity_dwt"], 1_020_000)
         self.assertGreaterEqual(result["query_elapsed_ms"], 0)
         self.assertGreater(result["partition_bytes"], 0)
 
