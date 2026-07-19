@@ -8,8 +8,11 @@ This folder is the published Terraflux site. GitHub Pages serves it from `main`
 The site runs the read path **entirely in the browser**: static pages load DuckDB-WASM,
 read the aggregate Parquet, and compute per-gate flux client-side — no query server.
 
-- `index.html` — the **flux map**: each gate is a bubble sized by laden energy, with an
-  arrow along the laden flow direction (d3-geo over a world-atlas basemap).
+- `index.html` — the **3D flux globe**: a night-Earth globe (globe.gl / Three.js) with a
+  bar rising from each gate (height ∝ laden energy) and an animated arc tracing the laden
+  flow. Drag to rotate; auto-rotates.
+- `flat.html` — a 2D world **flux map** (d3-geo): each gate a bubble sized by laden
+  energy with a flow arrow. A lighter-weight alternative view.
 - `table.html` — the plain per-gate aggregate (the data proof). Matches the Python
   pipeline exactly (Hormuz ≈45.2 PJ, Malacca ≈32.2 PJ for 2026-07-17).
 - `crossings.parquet`, `gates.json` — the generated aggregate artifacts the pages query.
@@ -47,7 +50,7 @@ Then open <http://localhost:8778/>.
   threaded build, which needs cross-origin isolation (COOP/COEP) a plain static host
   (including Pages) does not provide. 1.31.0 also bundles the Parquet reader, so no
   download from `extensions.duckdb.org` is needed.
-- The pages load DuckDB-WASM, d3, and the world-atlas basemap from the jsDelivr CDN, so
-  a browser with network access is required.
+- The pages load DuckDB-WASM, globe.gl/Three.js, d3, and Earth textures from the jsDelivr
+  and unpkg CDNs, so a browser with network access (and WebGL, for the globe) is required.
 - No bundler or framework — plain static files. A future build step could pin and
   vendor these dependencies.
