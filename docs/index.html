@@ -3,54 +3,54 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>Terraflux — energy flux map</title>
+    <title>Terraflux — energy flux globe</title>
     <style>
-      :root { color-scheme: light; }
+      :root { color-scheme: dark; }
+      html, body { margin: 0; height: 100%; background: #000308; }
       body {
         font-family: ui-sans-serif, system-ui, -apple-system, sans-serif;
-        margin: 0;
-        background: #0b1622;
         color: #e8eef5;
+        overflow: hidden;
       }
-      header { padding: 1rem 1.25rem 0; }
-      h1 { font-size: 1.15rem; margin: 0; }
-      p.lede { color: #9fb2c6; margin: 0.3rem 0 0; font-size: 0.9rem; max-width: 60ch; }
-      #status { font-family: ui-monospace, monospace; color: #7f94aa; font-size: 0.8rem; }
-      #map { width: 100%; height: auto; display: block; }
-      .ocean { fill: #10202f; }
-      .land { fill: #21384c; stroke: #2c4a63; stroke-width: 0.4; }
-      .graticule { fill: none; stroke: #1a2f42; stroke-width: 0.4; }
-      .gate-flow { stroke: #ffd27f; stroke-width: 2; }
-      .gate-bubble { fill: #ff7a45; fill-opacity: 0.75; stroke: #ffd9c4; stroke-width: 1; }
-      .gate-label { fill: #e8eef5; font-size: 11px; font-weight: 600; }
-      .gate-sub { fill: #9fb2c6; font-size: 10px; }
-      .legend { fill: #9fb2c6; font-size: 11px; }
+      #globe { position: fixed; inset: 0; }
+      .panel {
+        position: fixed;
+        top: 0; left: 0; right: 0;
+        padding: 1rem 1.25rem;
+        background: linear-gradient(#000308cc, #00030800);
+        pointer-events: none;
+      }
+      h1 { font-size: 1.1rem; margin: 0; }
+      p.lede {
+        color: #9fb2c6; margin: 0.3rem 0 0; font-size: 0.85rem; max-width: 62ch;
+      }
+      p.lede a { color: #ffd27f; pointer-events: auto; }
+      #status { font-family: ui-monospace, monospace; color: #7f94aa; font-size: 0.78rem; margin-top: 0.3rem; }
+      .label { font: 600 12px ui-sans-serif, system-ui, sans-serif; color: #fff; text-shadow: 0 1px 3px #000; white-space: nowrap; }
+      .label small { display: block; font-weight: 400; color: #ffd0b8; }
     </style>
   </head>
   <body>
-    <header>
+    <div id="globe"></div>
+    <div class="panel">
       <h1>Terraflux — observed fossil-energy flux</h1>
       <p class="lede">
         Laden-capacity energy transiting each gate on 2026-07-17, queried in-browser
-        with DuckDB-WASM. Bubble area ∝ energy; the arrow points along the laden flow.
+        with DuckDB-WASM. Bar height ∝ energy; the arc traces the laden flow.
         Observed telemetry-derived estimate, not measured cargo.
-        <a href="table.html" style="color: #ffd27f">table view →</a>
+        <a href="flat.html">2D map</a> · <a href="table.html">table</a>
       </p>
       <p id="status">Booting…</p>
-    </header>
-    <svg id="map" viewBox="0 0 960 500" preserveAspectRatio="xMidYMid meet"></svg>
+    </div>
 
+    <script src="https://cdn.jsdelivr.net/npm/globe.gl"></script>
     <script type="module">
-      import * as d3 from "https://cdn.jsdelivr.net/npm/d3@7/+esm";
-      import * as topojson from "https://cdn.jsdelivr.net/npm/topojson-client@3/+esm";
+      const status = document.getElementById("status");
+      const setStatus = (m) => (status.textContent = m);
 
       const DUCKDB_VERSION = "1.31.0";
       const DIST = `https://cdn.jsdelivr.net/npm/@duckdb/duckdb-wasm@${DUCKDB_VERSION}/dist`;
-      const WORLD_URL =
-        "https://cdn.jsdelivr.net/npm/world-atlas@2/countries-110m.json";
-
-      const status = document.getElementById("status");
-      const setStatus = (m) => (status.textContent = m);
+      const TEX = "https://unpkg.com/three-globe/example/img";
 
       const FLUX_QUERY = `
         SELECT
@@ -83,86 +83,95 @@
         return new Map(rows.map((r) => [r.gate, r]));
       }
 
+      // Great-circle destination point from (lat, lon) along a bearing.
+      function destination(lat, lon, bearingDeg, distDeg) {
+        const d = (distDeg * Math.PI) / 180;
+        const t = (bearingDeg * Math.PI) / 180;
+        const p1 = (lat * Math.PI) / 180;
+        const l1 = (lon * Math.PI) / 180;
+        const p2 = Math.asin(
+          Math.sin(p1) * Math.cos(d) + Math.cos(p1) * Math.sin(d) * Math.cos(t),
+        );
+        const l2 =
+          l1 +
+          Math.atan2(
+            Math.sin(t) * Math.sin(d) * Math.cos(p1),
+            Math.cos(d) - Math.sin(p1) * Math.sin(p2),
+          );
+        return [(p2 * 180) / Math.PI, (((l2 * 180) / Math.PI + 540) % 360) - 180];
+      }
+
       async function main() {
         setStatus("Querying flux with DuckDB-WASM…");
-        const [flux, gates, world] = await Promise.all([
+        const [flux, gates] = await Promise.all([
           queryFlux(),
           fetch("gates.json").then((r) => r.json()),
-          fetch(WORLD_URL).then((r) => r.json()),
         ]);
-        setStatus("Rendering…");
-
-        const svg = d3.select("#map");
-        const W = 960, H = 500;
-        const projection = d3.geoEquirectangular().fitExtent(
-          [[8, 8], [W - 8, H - 8]],
-          { type: "Sphere" },
-        );
-        const path = d3.geoPath(projection);
-
-        svg.append("path").attr("class", "ocean").attr("d", path({ type: "Sphere" }));
-        svg.append("path").attr("class", "graticule").attr("d", path(d3.geoGraticule10()));
-        const land = topojson.feature(world, world.objects.countries);
-        svg.append("path").attr("class", "land").attr("d", path(land));
-
-        // Arrowhead marker.
-        svg
-          .append("defs")
-          .append("marker")
-          .attr("id", "arrow")
-          .attr("viewBox", "0 0 10 10")
-          .attr("refX", 8)
-          .attr("refY", 5)
-          .attr("markerWidth", 6)
-          .attr("markerHeight", 6)
-          .attr("orient", "auto-start-reverse")
-          .append("path")
-          .attr("d", "M0,0 L10,5 L0,10 z")
-          .attr("fill", "#ffd27f");
 
         const points = gates
-          .map((g) => ({ ...g, ...(flux.get(g.name) ?? { energy_gj: 0, laden: 0 }) }))
-          .filter((g) => g.energy_gj > 0);
-
-        const maxPJ = d3.max(points, (g) => g.energy_gj / 1e6) || 1;
-        const radius = d3.scaleSqrt().domain([0, maxPJ]).range([3, 34]);
-
-        const g = svg.append("g");
-        for (const gate of points) {
-          const [x, y] = projection([gate.lon, gate.lat]);
-          const pj = gate.energy_gj / 1e6;
-          const r = radius(pj);
-
-          // Flow arrow along the outbound bearing (0=N, clockwise).
-          const b = (gate.outbound_bearing_deg * Math.PI) / 180;
-          const len = r + 22;
-          const x2 = x + Math.sin(b) * len;
-          const y2 = y - Math.cos(b) * len;
-          g.append("line")
-            .attr("class", "gate-flow")
-            .attr("x1", x).attr("y1", y).attr("x2", x2).attr("y2", y2)
-            .attr("marker-end", "url(#arrow)");
-
-          g.append("circle").attr("class", "gate-bubble").attr("cx", x).attr("cy", y).attr("r", r);
-          g.append("text").attr("class", "gate-label").attr("x", x + r + 6).attr("y", y - 2)
-            .text(gate.name.replace(/_/g, " "));
-          g.append("text").attr("class", "gate-sub").attr("x", x + r + 6).attr("y", y + 11)
-            .text(`${pj.toFixed(1)} PJ · ${gate.laden} laden`);
-        }
-
-        // Size legend.
-        const legend = svg.append("g").attr("transform", `translate(24, ${H - 70})`);
-        legend.append("text").attr("class", "legend").attr("y", -10).text("energy / day");
-        [Math.round(maxPJ), Math.round(maxPJ / 3)].forEach((pj, i) => {
-          const r = radius(pj);
-          const cx = 16 + i * 90;
-          legend.append("circle").attr("class", "gate-bubble").attr("cx", cx).attr("cy", 0).attr("r", r);
-          legend.append("text").attr("class", "legend").attr("x", cx).attr("y", 30)
-            .attr("text-anchor", "middle").text(`${pj} PJ`);
+          .map((g) => {
+            const f = flux.get(g.name) ?? { energy_gj: 0, laden: 0 };
+            return { ...g, pj: f.energy_gj / 1e6, laden: f.laden };
+          })
+          .filter((p) => p.pj > 0);
+        const maxPJ = Math.max(...points.map((p) => p.pj), 1);
+        const arcs = points.map((p) => {
+          const [elat, elng] = destination(p.lat, p.lon, p.outbound_bearing_deg, 9);
+          return { slat: p.lat, slng: p.lon, elat, elng };
         });
 
-        const totalPJ = d3.sum(points, (g) => g.energy_gj / 1e6);
-        setStatus(`${points.length} gates · ${totalPJ.toFixed(1)} PJ observed on 2026-07-17`);
+        setStatus("Rendering globe…");
+        const world = Globe()(document.getElementById("globe"))
+          .backgroundColor("#000308")
+          .globeImageUrl(`${TEX}/earth-night.jpg`)
+          .bumpImageUrl(`${TEX}/earth-topology.png`)
+          .backgroundImageUrl(`${TEX}/night-sky.png`)
+          .showAtmosphere(true)
+          .atmosphereColor("#4a90d9")
+          .atmosphereAltitude(0.18)
+          // Energy bars.
+          .pointsData(points)
+          .pointLat("lat")
+          .pointLng("lon")
+          .pointColor(() => "#ff7a45")
+          .pointAltitude((d) => 0.02 + (d.pj / maxPJ) * 0.45)
+          .pointRadius(0.55)
+          .pointsMerge(false)
+          // Flow arcs.
+          .arcsData(arcs)
+          .arcStartLat("slat")
+          .arcStartLng("slng")
+          .arcEndLat("elat")
+          .arcEndLng("elng")
+          .arcColor(() => ["rgba(255,210,127,0.15)", "rgba(255,210,127,0.95)"])
+          .arcStroke(0.6)
+          .arcDashLength(0.5)
+          .arcDashGap(0.25)
+          .arcDashAnimateTime(2200)
+          .arcAltitudeAutoScale(0.4)
+          // HTML labels.
+          .htmlElementsData(points)
+          .htmlLat("lat")
+          .htmlLng("lon")
+          .htmlAltitude((d) => 0.04 + (d.pj / maxPJ) * 0.45)
+          .htmlElement((d) => {
+            const el = document.createElement("div");
+            el.className = "label";
+            el.innerHTML = `${d.name.replace(/_/g, " ")}<small>${d.pj.toFixed(1)} PJ · ${d.laden} laden</small>`;
+            return el;
+          });
+
+        world.controls().autoRotate = true;
+        world.controls().autoRotateSpeed = 0.5;
+        world.pointOfView({ lat: 18, lng: 74, altitude: 2.3 }, 0);
+
+        const resize = () =>
+          world.width(window.innerWidth).height(window.innerHeight);
+        resize();
+        window.addEventListener("resize", resize);
+
+        const totalPJ = points.reduce((s, p) => s + p.pj, 0);
+        setStatus(`${points.length} gates · ${totalPJ.toFixed(1)} PJ observed on 2026-07-17 · drag to rotate`);
       }
 
       main().catch((e) => {
