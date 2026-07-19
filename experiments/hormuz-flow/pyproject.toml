@@ -15,8 +15,8 @@ package = false
 
 [dependency-groups]
 dev = [
-    "mypy>=2.3.0",
     "ruff>=0.15.22",
+    "ty>=0.0.61",
 ]
 
 [tool.ruff]
@@ -26,9 +26,5 @@ target-version = "py312"
 # pycodestyle, pyflakes, isort, pyupgrade, flake8-bugbear.
 select = ["E", "F", "I", "UP", "B"]
 
-[tool.mypy]
-python_version = "3.12"
-check_untyped_defs = true
-warn_redundant_casts = true
-warn_unused_ignores = true
-no_implicit_optional = true
+[tool.ty.environment]
+python-version = "3.12"

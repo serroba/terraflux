@@ -47,7 +47,7 @@ The generated `data/` directory is disposable and ignored by Git.
 ```sh
 uv run ruff check .          # lint
 uv run ruff format --check . # formatting
-uv run mypy .                # type check
+uv run ty check .            # type check
 uv run python -m unittest discover -p "test_*.py"  # tests
 ```
 
