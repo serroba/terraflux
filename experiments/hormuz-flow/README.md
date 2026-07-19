@@ -22,9 +22,17 @@ agrees with it on sign for every row.
 Each crossing is also tagged laden or ballast. Hormuz is an export chokepoint, so
 loaded vessels head outbound and return in ballast; the gate's `laden_direction`
 ("outbound") drives the flag (`laden_method = "direction"`). Laden flux therefore counts
-only the loaded legs, not the empty returns — the denominator a later energy-equivalence
-slice will convert to joules. Refining laden state from reported draught is left to a
-future slice.
+only the loaded legs, not the empty returns. Refining laden state from reported draught
+is left to a future slice.
+
+Laden capacity is then expressed as **energy flux** (`commodity.py`). Each vessel class
+maps to a commodity (crude tanker → crude oil, product tanker → refined products, LNG
+carrier → LNG) and that commodity's net calorific value in GJ/tonne, from the 2006 IPCC
+Guidelines (Vol. 2, Ch. 1, Table 1.2). `observed_energy_gj` sums the laden legs, so the
+daily result reads as *energy leaving the Gulf* (≈45 PJ for 2026-07-17). This is a
+capacity-based upper estimate, not measured cargo energy: deadweight tonnage is a
+capacity ceiling, and for LNG it is an especially rough proxy (LNG capacity is
+volumetric). Only liquid and gas fossil classes are modelled; dry bulk is deferred.
 
 ## Run
 
@@ -41,7 +49,7 @@ and prints the aggregate plus basic execution diagnostics as JSON.
 The aggregate portion of the output is deterministic:
 
 ```json
-{"event_date":"2026-07-17","observed_crossings":5,"inbound_crossings":2,"outbound_crossings":3,"observed_capacity_dwt":1440000,"laden_crossings":3,"laden_capacity_dwt":1020000}
+{"event_date":"2026-07-17","observed_crossings":5,"inbound_crossings":2,"outbound_crossings":3,"observed_capacity_dwt":1440000,"laden_crossings":3,"laden_capacity_dwt":1020000,"observed_energy_gj":45212000}
 ```
 
 `query_elapsed_ms` and `partition_bytes` provide an initial local baseline. Elapsed time

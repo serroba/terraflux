@@ -106,9 +106,11 @@ It currently:
 5. Assigns direction from the side entered.
 6. Tags each crossing laden or ballast from the gate's expected laden direction
    (Hormuz is an exporter, so outbound is laden).
-7. Writes derived events as date-partitioned Parquet under the ignored `data/` folder.
-8. Queries one day directly from those Parquet files with DuckDB.
-9. Prints a JSON aggregate plus local timing and partition-size diagnostics.
+7. Classifies each vessel's commodity and converts laden capacity to energy using
+   published net calorific values (`experiments/hormuz-flow/commodity.py`).
+8. Writes derived events as date-partitioned Parquet under the ignored `data/` folder.
+9. Queries one day directly from those Parquet files with DuckDB.
+10. Prints a JSON aggregate plus local timing and partition-size diagnostics.
 
 The deterministic result for 2026-07-17 is:
 
@@ -120,13 +122,16 @@ The deterministic result for 2026-07-17 is:
   "outbound_crossings": 3,
   "observed_capacity_dwt": 1440000,
   "laden_crossings": 3,
-  "laden_capacity_dwt": 1020000
+  "laden_capacity_dwt": 1020000,
+  "observed_energy_gj": 45212000
 }
 ```
 
 Laden flux counts only the loaded legs (the three outbound crude/LNG transits),
-excluding the empty ballast returns — the throughput denominator a later
-energy-equivalence slice will convert into energy units.
+excluding the empty ballast returns. `observed_energy_gj` converts that laden capacity
+to energy via per-commodity net calorific values (2006 IPCC Guidelines) — so the day
+reads as roughly 45 PJ of fossil energy leaving the Gulf. It is a capacity-based upper
+estimate, not measured cargo energy.
 
 The signed gate distance is now computed from each observation's latitude and
 longitude against a coordinate-defined gate (`experiments/hormuz-flow/gate.py`), using

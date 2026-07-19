@@ -3,8 +3,9 @@ from pathlib import Path
 from time import perf_counter
 
 import duckdb
-from duckdb.sqltypes import DOUBLE
+from duckdb.sqltypes import BIGINT, DOUBLE, VARCHAR
 
+from commodity import commodity_for, energy_content_gj
 from gate import HORMUZ_GATE
 
 EXPERIMENT_DIR = Path(__file__).resolve().parent
@@ -25,6 +26,13 @@ def main() -> None:
             lambda lat, lon: HORMUZ_GATE.signed_distance_nm(lat, lon),
             [DOUBLE, DOUBLE],
             DOUBLE,
+        )
+
+        # Classify each vessel's commodity and its capacity-based energy content, so
+        # laden capacity can be expressed as an energy flux (see commodity.py).
+        connection.create_function("commodity_for", commodity_for, [VARCHAR], VARCHAR)
+        connection.create_function(
+            "energy_content_gj", energy_content_gj, [VARCHAR, BIGINT], DOUBLE
         )
 
         connection.execute(
@@ -68,7 +76,9 @@ def main() -> None:
             SELECT
                 *,
                 direction = '{HORMUZ_GATE.laden_direction}' AS laden,
-                'direction' AS laden_method
+                'direction' AS laden_method,
+                commodity_for(vessel_class) AS commodity,
+                energy_content_gj(vessel_class, capacity_dwt) AS energy_gj
             FROM crossings
             """
         )
@@ -94,7 +104,9 @@ def main() -> None:
                 count(*) FILTER (WHERE direction = 'outbound') AS outbound_crossings,
                 sum(capacity_dwt) AS observed_capacity_dwt,
                 count(*) FILTER (WHERE laden) AS laden_crossings,
-                sum(capacity_dwt) FILTER (WHERE laden) AS laden_capacity_dwt
+                sum(capacity_dwt) FILTER (WHERE laden) AS laden_capacity_dwt,
+                CAST(round(sum(energy_gj) FILTER (WHERE laden)) AS BIGINT)
+                    AS observed_energy_gj
             FROM read_parquet(
                 '{DATASET_DIR.as_posix()}/**/*.parquet',
                 hive_partitioning = true
@@ -116,6 +128,7 @@ def main() -> None:
         "observed_capacity_dwt",
         "laden_crossings",
         "laden_capacity_dwt",
+        "observed_energy_gj",
     )
     result = dict(zip(keys, row, strict=True))
     query_partition = DATASET_DIR / f"event_date={QUERY_DATE}"
