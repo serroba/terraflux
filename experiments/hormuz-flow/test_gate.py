@@ -3,10 +3,10 @@ import unittest
 from math import copysign
 from pathlib import Path
 
-from gate import HORMUZ_GATE, Gate
+from gate import GATES, HORMUZ_GATE, Gate
 
 EXPERIMENT_DIR = Path(__file__).resolve().parent
-TELEMETRY_FIXTURE = EXPERIMENT_DIR / "fixtures" / "telemetry.csv"
+FIXTURES_DIR = EXPERIMENT_DIR / "fixtures"
 
 
 class GateGeometryTest(unittest.TestCase):
@@ -33,26 +33,29 @@ class GateGeometryTest(unittest.TestCase):
         self.assertFalse(HORMUZ_GATE.is_laden("inbound"))
 
     def test_computed_sign_matches_fixture_oracle(self) -> None:
-        # The fixture still carries a hand-authored signed_gate_distance_nm. It is
+        # Each fixture still carries a hand-authored signed_gate_distance_nm. It is
         # no longer the source of truth, but it records the intended side for each
-        # observation, so the computed geometry must agree with it on sign.
-        with TELEMETRY_FIXTURE.open(newline="") as handle:
-            rows = list(csv.DictReader(handle))
+        # observation, so the computed geometry must agree with it on sign — for
+        # every gate in the registry.
+        for name, gate in GATES.items():
+            fixture = FIXTURES_DIR / f"{name}.csv"
+            with fixture.open(newline="") as handle:
+                rows = list(csv.DictReader(handle))
 
-        self.assertEqual(len(rows), 15)
-        for row in rows:
-            computed = HORMUZ_GATE.signed_distance_nm(
-                float(row["latitude"]), float(row["longitude"])
-            )
-            expected = float(row["signed_gate_distance_nm"])
-            self.assertEqual(
-                copysign(1.0, computed),
-                copysign(1.0, expected),
-                msg=(
-                    f"mmsi {row['mmsi']} at {row['observed_at']}: computed "
-                    f"{computed:.3f} nm disagrees on sign with oracle {expected}"
-                ),
-            )
+            self.assertGreater(len(rows), 0, msg=f"{name} fixture is empty")
+            for row in rows:
+                computed = gate.signed_distance_nm(
+                    float(row["latitude"]), float(row["longitude"])
+                )
+                expected = float(row["signed_gate_distance_nm"])
+                self.assertEqual(
+                    copysign(1.0, computed),
+                    copysign(1.0, expected),
+                    msg=(
+                        f"{name} mmsi {row['mmsi']} at {row['observed_at']}: computed "
+                        f"{computed:.3f} nm disagrees on sign with oracle {expected}"
+                    ),
+                )
 
 
 if __name__ == "__main__":

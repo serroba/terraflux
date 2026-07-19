@@ -89,3 +89,22 @@ HORMUZ_GATE = Gate(
     # Gulf of Oman; inbound vessels return in ballast.
     laden_direction="outbound",
 )
+
+# Illustrative synthetic gate for the Strait of Malacca. As with Hormuz, these are
+# chosen coordinates, not a surveyed boundary. Tankers bound for East Asian importers
+# transit laden toward the positive ("outbound") side and return in ballast.
+MALACCA_GATE = Gate(
+    name="strait_of_malacca",
+    start_lat=2.60,
+    start_lon=101.20,
+    end_lat=2.40,
+    end_lon=101.45,
+    laden_direction="outbound",
+)
+
+# Registry of the gates the experiment measures, keyed by gate name. The pipeline
+# processes each gate against its own telemetry fixture.
+GATES: dict[str, Gate] = {
+    HORMUZ_GATE.name: HORMUZ_GATE,
+    MALACCA_GATE.name: MALACCA_GATE,
+}
