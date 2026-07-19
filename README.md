@@ -95,49 +95,53 @@ choose repository-wide tooling until at least two real components require it.
 ## What exists today
 
 The [`hormuz-flow`](experiments/hormuz-flow/README.md) experiment is a tested local slice.
-It currently:
+It measures a small registry of gates (the Straits of Hormuz and Malacca) and currently:
 
-1. Reads 15 synthetic telemetry observations from
-   `experiments/hormuz-flow/fixtures/telemetry.csv`.
-2. Computes each observation's signed distance from a coordinate-defined gate in code
-   (`experiments/hormuz-flow/gate.py`), using a planar approximation.
+1. Reads synthetic telemetry for each gate from
+   `experiments/hormuz-flow/fixtures/<gate>.csv`.
+2. Computes each observation's signed distance from that gate's coordinate-defined line
+   in code (`experiments/hormuz-flow/gate.py`), using a planar approximation.
 3. Orders observations by MMSI and time.
 4. Detects a crossing when consecutive signed gate distances change sign.
 5. Assigns direction from the side entered.
 6. Tags each crossing laden or ballast from the gate's expected laden direction
-   (Hormuz is an exporter, so outbound is laden).
+   (an exporter's loaded leg is outbound).
 7. Classifies each vessel's commodity and converts laden capacity to energy using
    published net calorific values (`experiments/hormuz-flow/commodity.py`).
-8. Writes derived events as date-partitioned Parquet under the ignored `data/` folder.
-9. Queries one day directly from those Parquet files with DuckDB.
-10. Prints a JSON aggregate plus local timing and partition-size diagnostics.
+8. Writes derived events as Parquet partitioned by gate and date under the ignored
+   `data/` folder.
+9. Queries one day across all gates directly from those Parquet files with DuckDB.
+10. Prints per-gate JSON aggregates plus local timing and partition-size diagnostics.
 
-The deterministic result for 2026-07-17 is:
+The per-gate deterministic result for 2026-07-17 is:
 
 ```json
 {
-  "event_date": "2026-07-17",
-  "observed_crossings": 5,
-  "inbound_crossings": 2,
-  "outbound_crossings": 3,
-  "observed_capacity_dwt": 1440000,
-  "laden_crossings": 3,
-  "laden_capacity_dwt": 1020000,
-  "observed_energy_gj": 45212000
+  "query_date": "2026-07-17",
+  "gates": {
+    "strait_of_hormuz": {
+      "observed_crossings": 5, "inbound_crossings": 2, "outbound_crossings": 3,
+      "observed_capacity_dwt": 1440000, "laden_crossings": 3,
+      "laden_capacity_dwt": 1020000, "observed_energy_gj": 45212000
+    },
+    "strait_of_malacca": {
+      "observed_crossings": 4, "inbound_crossings": 1, "outbound_crossings": 3,
+      "observed_capacity_dwt": 830000, "laden_crossings": 3,
+      "laden_capacity_dwt": 740000, "observed_energy_gj": 32214000
+    }
+  }
 }
 ```
 
-Laden flux counts only the loaded legs (the three outbound crude/LNG transits),
-excluding the empty ballast returns. `observed_energy_gj` converts that laden capacity
-to energy via per-commodity net calorific values (2006 IPCC Guidelines) — so the day
-reads as roughly 45 PJ of fossil energy leaving the Gulf. It is a capacity-based upper
-estimate, not measured cargo energy.
+For each gate, laden flux counts only the loaded legs, excluding the empty ballast
+returns. `observed_energy_gj` converts that laden capacity to energy via per-commodity
+net calorific values (2006 IPCC Guidelines) — so each day reads as fossil energy
+transiting the strait (~45 PJ at Hormuz, ~32 PJ at Malacca). These are capacity-based
+upper estimates, not measured cargo energy.
 
-The signed gate distance is now computed from each observation's latitude and
-longitude against a coordinate-defined gate (`experiments/hormuz-flow/gate.py`), using
-a planar approximation. The fixture retains its original `signed_gate_distance_nm`
-column only as a reference oracle: a test asserts the computed geometry agrees with it
-on sign for every row. Geodesic accuracy, gate buffers, and noisy trajectories remain
+Each fixture retains its original `signed_gate_distance_nm` column only as a reference
+oracle: a test asserts the computed geometry agrees with it on sign for every row of
+every gate. Geodesic accuracy, gate buffers, and noisy trajectories remain
 intentionally unresolved.
 
 GitHub Actions runs the deterministic experiment test for every pull request and every
