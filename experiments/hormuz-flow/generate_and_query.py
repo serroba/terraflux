@@ -7,7 +7,6 @@ from duckdb.sqltypes import DOUBLE
 
 from gate import HORMUZ_GATE
 
-
 EXPERIMENT_DIR = Path(__file__).resolve().parent
 TELEMETRY_FIXTURE = EXPERIMENT_DIR / "fixtures" / "telemetry.csv"
 DATASET_DIR = EXPERIMENT_DIR / "data" / "crossings"
@@ -97,6 +96,9 @@ def main() -> None:
         ).fetchone()
         query_elapsed_ms = round((perf_counter() - query_started) * 1000, 3)
 
+    if row is None:
+        raise RuntimeError(f"No crossing events found for {QUERY_DATE}")
+
     keys = (
         "event_date",
         "observed_crossings",
@@ -104,7 +106,7 @@ def main() -> None:
         "outbound_crossings",
         "observed_capacity_dwt",
     )
-    result = dict(zip(keys, row))
+    result = dict(zip(keys, row, strict=True))
     query_partition = DATASET_DIR / f"event_date={QUERY_DATE}"
     result["query_elapsed_ms"] = query_elapsed_ms
     result["partition_bytes"] = sum(
