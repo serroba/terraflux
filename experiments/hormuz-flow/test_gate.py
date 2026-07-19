@@ -23,9 +23,14 @@ class GateGeometryTest(unittest.TestCase):
         self.assertAlmostEqual(distance, 0.0, places=6)
 
     def test_zero_length_gate_is_rejected(self) -> None:
-        degenerate = Gate("point", 26.5, 56.2, 26.5, 56.2)
+        degenerate = Gate("point", 26.5, 56.2, 26.5, 56.2, laden_direction="outbound")
         with self.assertRaises(ValueError):
             degenerate.signed_distance_nm(26.5, 56.2)
+
+    def test_is_laden_matches_gate_direction(self) -> None:
+        self.assertEqual(HORMUZ_GATE.laden_direction, "outbound")
+        self.assertTrue(HORMUZ_GATE.is_laden("outbound"))
+        self.assertFalse(HORMUZ_GATE.is_laden("inbound"))
 
     def test_computed_sign_matches_fixture_oracle(self) -> None:
         # The fixture still carries a hand-authored signed_gate_distance_nm. It is

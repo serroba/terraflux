@@ -47,22 +47,29 @@ def main() -> None:
                         PARTITION BY mmsi ORDER BY observed_at
                     ) AS previous_gate_distance_nm
                 FROM observations
+            ),
+            crossings AS (
+                SELECT
+                    observed_at AS timestamp,
+                    CAST(observed_at AS DATE) AS event_date,
+                    mmsi,
+                    CASE
+                        WHEN signed_gate_distance_nm > 0 THEN 'outbound'
+                        ELSE 'inbound'
+                    END AS direction,
+                    vessel_class,
+                    capacity_dwt
+                FROM ordered_telemetry
+                WHERE previous_gate_distance_nm IS NOT NULL
+                  AND signed_gate_distance_nm != 0
+                  AND previous_gate_distance_nm != 0
+                  AND sign(signed_gate_distance_nm) != sign(previous_gate_distance_nm)
             )
             SELECT
-                observed_at AS timestamp,
-                CAST(observed_at AS DATE) AS event_date,
-                mmsi,
-                CASE
-                    WHEN signed_gate_distance_nm > 0 THEN 'outbound'
-                    ELSE 'inbound'
-                END AS direction,
-                vessel_class,
-                capacity_dwt
-            FROM ordered_telemetry
-            WHERE previous_gate_distance_nm IS NOT NULL
-              AND signed_gate_distance_nm != 0
-              AND previous_gate_distance_nm != 0
-              AND sign(signed_gate_distance_nm) != sign(previous_gate_distance_nm)
+                *,
+                direction = '{HORMUZ_GATE.laden_direction}' AS laden,
+                'direction' AS laden_method
+            FROM crossings
             """
         )
 
@@ -85,7 +92,9 @@ def main() -> None:
                 count(*) AS observed_crossings,
                 count(*) FILTER (WHERE direction = 'inbound') AS inbound_crossings,
                 count(*) FILTER (WHERE direction = 'outbound') AS outbound_crossings,
-                sum(capacity_dwt) AS observed_capacity_dwt
+                sum(capacity_dwt) AS observed_capacity_dwt,
+                count(*) FILTER (WHERE laden) AS laden_crossings,
+                sum(capacity_dwt) FILTER (WHERE laden) AS laden_capacity_dwt
             FROM read_parquet(
                 '{DATASET_DIR.as_posix()}/**/*.parquet',
                 hive_partitioning = true
@@ -105,6 +114,8 @@ def main() -> None:
         "inbound_crossings",
         "outbound_crossings",
         "observed_capacity_dwt",
+        "laden_crossings",
+        "laden_capacity_dwt",
     )
     result = dict(zip(keys, row, strict=True))
     query_partition = DATASET_DIR / f"event_date={QUERY_DATE}"

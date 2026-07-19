@@ -19,6 +19,13 @@ longer the source of truth; it records the *intended* side for each observation 
 used only as a reference oracle in `test_gate.py`, which asserts the computed geometry
 agrees with it on sign for every row.
 
+Each crossing is also tagged laden or ballast. Hormuz is an export chokepoint, so
+loaded vessels head outbound and return in ballast; the gate's `laden_direction`
+("outbound") drives the flag (`laden_method = "direction"`). Laden flux therefore counts
+only the loaded legs, not the empty returns — the denominator a later energy-equivalence
+slice will convert to joules. Refining laden state from reported draught is left to a
+future slice.
+
 ## Run
 
 From this directory:
@@ -34,7 +41,7 @@ and prints the aggregate plus basic execution diagnostics as JSON.
 The aggregate portion of the output is deterministic:
 
 ```json
-{"event_date":"2026-07-17","observed_crossings":5,"inbound_crossings":2,"outbound_crossings":3,"observed_capacity_dwt":1440000}
+{"event_date":"2026-07-17","observed_crossings":5,"inbound_crossings":2,"outbound_crossings":3,"observed_capacity_dwt":1440000,"laden_crossings":3,"laden_capacity_dwt":1020000}
 ```
 
 `query_elapsed_ms` and `partition_bytes` provide an initial local baseline. Elapsed time
