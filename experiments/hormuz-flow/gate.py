@@ -16,7 +16,7 @@ project README).
 from __future__ import annotations
 
 from dataclasses import dataclass
-from math import cos, hypot, radians
+from math import atan2, cos, degrees, hypot, radians
 
 # One degree of latitude is ~60 nautical miles anywhere on the globe. One degree
 # of longitude shrinks by cos(latitude) as you move away from the equator.
@@ -44,6 +44,29 @@ class Gate:
     def is_laden(self, direction: str) -> bool:
         """Whether a crossing in ``direction`` is treated as laden at this gate."""
         return direction == self.laden_direction
+
+    def midpoint(self) -> tuple[float, float]:
+        """Midpoint of the gate line as ``(lat, lon)`` — where to plot the gate."""
+        return (
+            (self.start_lat + self.end_lat) / 2.0,
+            (self.start_lon + self.end_lon) / 2.0,
+        )
+
+    def outbound_bearing_deg(self) -> float:
+        """Compass bearing (0=N, 90=E) of the outbound side of the gate.
+
+        Laden vessels flow toward the positive ("outbound") side, which lies to the
+        left of the start->end gate vector. This returns the bearing of that flow so
+        a map can draw a direction arrow.
+        """
+        lat0 = (self.start_lat + self.end_lat) / 2.0
+        lon_scale = NM_PER_DEGREE_LATITUDE * cos(radians(lat0))
+        gate_east = (self.end_lon - self.start_lon) * lon_scale
+        gate_north = (self.end_lat - self.start_lat) * NM_PER_DEGREE_LATITUDE
+        # Left normal of (east, north) is (-north, east); it points to the positive
+        # side (see signed_distance_nm). Bearing is measured clockwise from north.
+        outbound_east, outbound_north = -gate_north, gate_east
+        return degrees(atan2(outbound_east, outbound_north)) % 360.0
 
     def signed_distance_nm(self, lat: float, lon: float) -> float:
         """Signed perpendicular distance from the gate line, in nautical miles.

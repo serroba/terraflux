@@ -26,10 +26,15 @@ uv run export_web_parquet.py     # flatten them into web/crossings.parquet
 python3 -m http.server 8777 -d web
 ```
 
-Then open <http://localhost:8777/>. The page prints the per-gate aggregate; it matches
-the Python pipeline exactly (Hormuz ≈45.2 PJ, Malacca ≈32.2 PJ for 2026-07-17).
+Then open:
 
-`web/crossings.parquet` is generated and Git-ignored.
+- <http://localhost:8777/> — the plain per-gate table (the data proof); matches the
+  Python pipeline exactly (Hormuz ≈45.2 PJ, Malacca ≈32.2 PJ for 2026-07-17).
+- <http://localhost:8777/map.html> — a world **flux map**: each gate is a bubble whose
+  area is its laden energy, with an arrow along the laden flow direction. Same
+  DuckDB-WASM query, drawn with d3-geo over a world-atlas basemap.
+
+`web/crossings.parquet` and `web/gates.json` are generated and Git-ignored.
 
 ## Notes
 
